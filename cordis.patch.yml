@@ -1,0 +1,16 @@
+# 安装时把这一条 insert 追加到 ~/.dsh/profiles/web/cordis.patch.yml（或由 bundle 加载器读取）。
+# 不修改任何 DSH 核心或其他插件的代码。
+- insert:
+    - id: relay-client
+      name: dsh-relay-client
+      config:
+        # 本机 pcpanel 中继地址。每台机器都跑自己的 panel，这里填本机的 127.0.0.1:8765。
+        # relay-client 像手机只连本地运营商（本机 panel），跨机转发由 panel 联邦层完成。
+        base: http://127.0.0.1:8765
+        # 三级地址第一级：必须与本机 panel 的 config.relay.machine_id 完全一致。
+        # 三台机器分别设成不同值，例如 pc-office / pc-backend / macbook。
+        machine_id: pc-office
+        # 三级地址第二级：本会话所在工作区，例如 mowen-frontend-windows（可留空）。
+        workspace: mowen-frontend-windows
+        poll_ms: 2000
+        heartbeat_ms: 60000

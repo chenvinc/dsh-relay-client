@@ -1,0 +1,49 @@
+{
+  "name": "dsh-relay-client",
+  "version": "0.1.0",
+  "description": "Bridge between pcpanel relay (control plane) and DeepSeek Harness sessions: bind logical names, poll inbox, inject messages via Agent.followup, and expose relay_bind / relay_send tools for cross-session, cross-device messaging.",
+  "type": "module",
+  "main": "./index.js",
+  "exports": {
+    ".": "./index.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "cordis.patch.yml",
+    "README.md",
+    "README.en.md",
+    "CHANGELOG.md",
+    "LICENSE",
+    "docs"
+  ],
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "relay",
+    "cross-session",
+    "cross-device",
+    "messaging",
+    "cordis"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node test/relay-client.test.mjs && node test/address.test.mjs",
+    "test:integration": "node test/integration.mjs"
+  },
+  "dsh": {
+    "engines": {
+      "dsh": ">=0.2.2-rc.1 <0.3.0-0"
+    },
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.1"
+  }
+}
