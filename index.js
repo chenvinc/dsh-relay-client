@@ -18,6 +18,11 @@ import path from 'node:path'
 export const name = 'relay-client'
 export const inject = ['tools', 'webServer']
 
+// 插件版本：必须与 package.json 的 version 保持一致（测试会校验两者）。
+// 通过 relay_bind 返回值 / HTTP bind 结果 / status 端点 / register 握手上报，
+// 让三端能核对是否跑同一版代码，避免原地热更后误判版本。
+export const PLUGIN_VERSION = '0.1.1'
+
 const NAME_RE = /^[a-z0-9][a-z0-9_-]{0,63}$/
 const TYPES = ['dispatch', 'progress', 'contract', 'result', 'ack', 'note']
 
@@ -57,7 +62,14 @@ function loadState() {
     const obj = JSON.parse(fs.readFileSync(statePath(), 'utf8'))
     const bindings = {}
     for (const [key, value] of Object.entries(obj.bindings || {})) {
-      if (value && typeof value === 'object') bindings[key] = value
+      if (!value || typeof value !== 'object') continue
+      const b = value
+      // 兼容旧版 state：早期 binding 未落 addr，这里按 machine/workspace/name 补算，
+      // 让"拿不到自己三级地址"的实例重启后自愈，无需重新 bind。
+      if (!b.addr) {
+        b.addr = [b.machine, b.workspace, b.name || key].filter(Boolean).join('/')
+      }
+      bindings[key] = b
     }
     return { bindings }
   } catch {
@@ -237,12 +249,14 @@ export function apply(ctx, options = {}) {
     try {
       const r = await httpJson(cfg.base, '/api/relay/register', {
         method: 'POST',
-        body: { logical_name: n, session_id: sid, machine: binding.machine, workspace: binding.workspace },
+        body: { logical_name: n, session_id: sid, machine: binding.machine, workspace: binding.workspace,
+                plugin_version: PLUGIN_VERSION },
         timeout: cfg.timeout_ms,
       })
       if (!r.ok) throw new Error(r.error || '注册被拒绝')
       line('已注册 ' + binding.addr + ' -> ' + sid)
-      return { ok: true, name: n, session_id: sid, addr: r.addr || binding.addr }
+      return { ok: true, name: n, session_id: sid, addr: r.addr || binding.addr,
+               plugin_version: PLUGIN_VERSION, server_version: r.server_version || '' }
     } catch (err) {
       binding.last_error = '注册失败：' + err.message
       saveState(state)
@@ -275,7 +289,7 @@ export function apply(ctx, options = {}) {
       machine: { type: 'string', required: false, description: '机器名（三级地址第一级），默认取插件配置的 machine_id，须与本机 panel 的 machine_id 一致' },
       workspace: { type: 'string', required: false, description: '工作区名（三级地址第二级），默认取插件配置的 workspace' },
     },
-    { type: 'object', properties: { ok: { type: 'boolean' }, name: { type: 'string' }, session_id: { type: 'string' }, addr: { type: 'string' } } },
+    { type: 'object', properties: { ok: { type: 'boolean' }, name: { type: 'string' }, session_id: { type: 'string' }, addr: { type: 'string' }, plugin_version: { type: 'string' }, server_version: { type: 'string' } } },
     async (args, exec) => {
       const sessionId = String(exec.agent?.id || exec.agent?.session?.id || '')
       return bind(args.logical_name, sessionId, args.machine, args.workspace)
@@ -357,7 +371,11 @@ export function apply(ctx, options = {}) {
       content: { type: 'string', required: true, description: '消息正文' },
       channel: { type: 'string', required: false, description: '项目/主题频道名' },
     },
-    { type: 'object', properties: { ok: { type: 'boolean' }, seq: { type: 'integer' }, error: { type: 'string' } } },
+    { type: 'object', properties: {
+        ok: { type: 'boolean' }, seq: { type: 'integer' }, error: { type: 'string' },
+        delivered: { type: 'array' }, failed: { type: 'array' },
+        forward_pending: { type: 'boolean' }, pending_count: { type: 'integer' },
+      } },
     async (args, exec) => {
       const sessionId = String(exec.agent?.id || exec.agent?.session?.id || '')
       const mine = findBySession(sessionId)
@@ -379,6 +397,12 @@ export function apply(ctx, options = {}) {
       // 因此失败时 seq 必须是显式值（null），且 error 只在存在时给出。
       const out = { ok: Boolean(r.ok), seq: r.message?.seq ?? null }
       if (r.error) out.error = r.error
+      // 跨机投递结果透传：本地副本 ok 不代表对端已收到。转发失败的机器列在 failed，
+      // 服务端已入待重投队列时 forward_pending=true，发送方据此判断是否需要重试/提醒。
+      if (Array.isArray(r.delivered)) out.delivered = r.delivered
+      if (Array.isArray(r.failed)) out.failed = r.failed
+      if (typeof r.forward_pending === 'boolean') out.forward_pending = r.forward_pending
+      if (typeof r.pending_count === 'number') out.pending_count = r.pending_count
       return out
     },
   )
@@ -390,11 +414,13 @@ export function apply(ctx, options = {}) {
       try {
         const r = await httpJson(cfg.base, '/api/relay/register', {
           method: 'POST',
-          body: { logical_name: b.name, session_id: b.session_id, machine: b.machine, workspace: b.workspace },
+          body: { logical_name: b.name, session_id: b.session_id, machine: b.machine, workspace: b.workspace,
+                  plugin_version: PLUGIN_VERSION },
           timeout: cfg.timeout_ms,
         })
         if (!r.ok) throw new Error(r.error || '注册被拒绝')
         b.last_error = ''
+        b.server_version = r.server_version || ''
       } catch (err) {
         b.last_error = '心跳失败：' + err.message
         line(b.name + ' ' + b.last_error)
@@ -472,7 +498,8 @@ export function apply(ctx, options = {}) {
         {
           kind: 'exact', path: '/relay-client/status', handler: (_req, res) => {
             const body = JSON.stringify({
-              ok: true, base: cfg.base, machine_id: cfg.machine_id || os.hostname(),
+              ok: true, plugin_version: PLUGIN_VERSION,
+              base: cfg.base, machine_id: cfg.machine_id || os.hostname(),
               workspace: cfg.workspace, poll_ms: cfg.poll_ms,
               bindings: Object.values(state.bindings), log: log.slice(-20),
             })
