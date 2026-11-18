@@ -32,10 +32,13 @@
 ## 安装
 
 ```bash
-npm install -g dsh-relay-client
+cd ~/.dsh/profiles/web        # 你的 DSH profile 目录
+pnpm add dsh-relay-client     # 或 npm install dsh-relay-client
 ```
 
-然后按 [安装文档](./docs/INSTALL.md) 把 bundle patch 加进 DSH profile，并配置 `base` / `machine_id` / `workspace`。
+再把 `dsh-relay-client` 追加到该 profile `package.json` 的 `dsh.profile.bundles`，
+并在 `cordis.patch.yml` 里填 `base` / `machine_id` / `workspace`。完整步骤见
+[安装文档](./docs/INSTALL.md)。注意：这是 DSH 的 bundle 插件，`npm install -g` 装到全局不会被加载。
 `machine_id` **必须与本机 panel 的 `config.relay.machine_id` 完全一致**，否则跨机三级寻址会失败。
 
 ## 工具
