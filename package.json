@@ -1,6 +1,6 @@
 {
   "name": "dsh-relay-client",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Bridge between pcpanel relay (control plane) and DeepSeek Harness sessions: bind logical names, poll inbox, inject messages via Agent.followup, and expose relay_bind / relay_send tools for cross-session, cross-device messaging.",
   "type": "module",
   "main": "./index.js",

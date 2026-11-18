@@ -1,10 +1,11 @@
 # 更新日志
 
-## 未发布
+## 0.1.2 — 安装文档修正
 
 - 文档：安装说明改为正确的「装进 DSH profile」方式——`pnpm add dsh-relay-client` +
   在 `dsh.profile.bundles` 登记 + 在 `cordis.patch.yml` 配置 `base` / `machine_id` /
   `workspace`；删除会被误读为可用的 `npm install -g` 全局安装写法。
+- 代码与 0.1.1 一致，仅重新打包以同步 npm 页面上的 README。
 
 ## 0.1.1 — 转发可见性与版本核对
 
