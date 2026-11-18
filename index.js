@@ -14,14 +14,16 @@ import { randomUUID } from 'node:crypto'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { createRequire } from 'node:module'
 
 export const name = 'relay-client'
 export const inject = ['tools', 'webServer']
 
-// 插件版本：必须与 package.json 的 version 保持一致（测试会校验两者）。
+// 插件版本：直接读 package.json，避免发版时忘记同步常量。
 // 通过 relay_bind 返回值 / HTTP bind 结果 / status 端点 / register 握手上报，
 // 让三端能核对是否跑同一版代码，避免原地热更后误判版本。
-export const PLUGIN_VERSION = '0.1.1'
+const pkg = createRequire(import.meta.url)('./package.json')
+export const PLUGIN_VERSION = pkg.version
 
 const NAME_RE = /^[a-z0-9][a-z0-9_-]{0,63}$/
 const TYPES = ['dispatch', 'progress', 'contract', 'result', 'ack', 'note']

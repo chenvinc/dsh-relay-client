@@ -55,7 +55,7 @@ function check(label, cond, detail = '') {
 }
 
 console.log('=== relay-improve 插件侧测试 ===')
-check('导出 PLUGIN_VERSION', typeof PLUGIN_VERSION === 'string' && PLUGIN_VERSION === '0.1.1', String(PLUGIN_VERSION))
+check('导出 PLUGIN_VERSION', typeof PLUGIN_VERSION === 'string' && /^\d+\.\d+\.\d+/.test(PLUGIN_VERSION), String(PLUGIN_VERSION))
 check('版本与 package.json 一致', PLUGIN_VERSION === pkg.version, `${PLUGIN_VERSION} vs ${pkg.version}`)
 
 apply(ctx, { base: 'http://mock:8765', poll_ms: 5000, heartbeat_ms: 60000, timeout_ms: 1000 })
